@@ -1,0 +1,8 @@
+{
+  "name": "company-pulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Executive company health and decision workspace",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node src/server.js", "dev": "node --watch src/server.js", "test": "node --test" }
+}
