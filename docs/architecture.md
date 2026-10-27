@@ -89,3 +89,32 @@ Agents propose; independent policy/approval service controls operations. More wo
 ## Evolution
 
 Preserve service contracts and provenance when moving DB/adding connectors. Extract adapters/jobs before considering microservices. Production gate includes PostgreSQL design, secrets, tenant isolation review, monitoring, rate limiting, backup/restore, retention policy, incident response and connector-specific threat analysis.
+
+## Implementation status (current slice)
+
+The running code follows ADR-001 to ADR-005 within a single demo workspace. Layers, from the outside in:
+
+```text
+src/server.js        entry: config, logger, database, HTTP server, graceful shutdown (SIGTERM/SIGINT, 10 s cap)
+src/app.js           createApp(db, options) → http.Server (testable, nothing listens until .listen)
+src/http/            router, JSON body limits, errors, security headers/CSP, origin check, request id + access log,
+                     rate limits, signed demo-persona session, static files with ETag
+src/routes/          workspace (health, session, dashboard, audit), agents (runs, proposal review), execution
+                     (meetings, decisions, tasks, scenarios); routes only parse input and call services
+src/workspace.js     application services: each command validates references, writes and audits in one transaction
+src/agents.js        agent orchestrator: run lifecycle, persistence of findings/evidence/proposals, human review
+src/domain/          pure modules (no I/O): metric catalog, threshold rules, briefing, scenario, permissions, errors
+src/store.js         all SQL, prepared once per connection
+src/db.js, seed.js   node:sqlite connection, migrations (PRAGMA user_version), transaction helper, demo fixtures
+```
+
+- **Rules and explainability:** `src/domain/rules.js` holds every threshold with a stable rule id and `RULESET_VERSION` (stored on each run). A signal carries the compared values (value, target, threshold, variance), the metric evidence that triggered it, hypotheses and explicit _limitations_; stale (>24 h) or low-confidence (<80 %) sources lower confidence and state why. The evaluation is pure and deterministic, so tests pin outputs without a database.
+- **Run lifecycle:** `running → succeeded | failed`. A run's output and audit events commit atomically; on failure everything rolls back and a `failed` run plus `agent.failed` audit event are recorded. `queued`/`cancelled` are not needed while runs are synchronous.
+- **Proposals:** a pending proposal with the same action and metric is reused (no duplicates on re-run). Approval executes only the allowlisted internal operation — creating the proposed task — in the same transaction as the audit event; rejection has no side effect. A SHA-256 hash of the canonical payload is stored at creation and re-checked at review.
+- **Current findings:** the dashboard shows findings from each agent's latest successful run, deduplicated by title, so it reflects the current state rather than accumulated history.
+- **Idempotency:** agent-run endpoints accept `Idempotency-Key`; a repeated key replays the stored result, a key reused for another scope or actor conflicts (409).
+- **Persistence:** WAL, `synchronous=NORMAL`, `busy_timeout=5000`, foreign keys, migrations from empty or from the unversioned MVP schema, append-only audit enforced by triggers. Amounts are still stored as REAL whole BRL in the demo fixtures; integer minor units remain a requirement before real data.
+
+### ADR-006 Zero third-party runtime dependencies — accepted
+
+The MVP runs on Node.js built-ins only (`node:http`, `node:sqlite`, `node:crypto`, `node:test`); ESLint and Prettier are development dependencies. This keeps setup to `npm start`, removes supply-chain exposure at runtime and makes the Docker image a copy of `src/` and `public/`. `node:sqlite` is flagged _experimental_ (stability 1.1) but unflagged since Node 22.13 and present in Node 24; its use is isolated in `src/db.js` and `src/store.js`, and the API surface used (prepare/get/all/run/exec) is small. The experimental warning is silenced in `npm start` and the image. Trade-off: hand-written routing and validation instead of a framework. Revisit (Express + better-sqlite3 or PostgreSQL) together with ADR-002 before real data or multiple instances.

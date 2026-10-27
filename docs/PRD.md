@@ -48,10 +48,10 @@ Shared behavior: on-demand or explicit demo schedule; only actor-authorized work
 
 ## Autonomy tiers and approvals
 
-| Tier | Example | MVP behavior |
-|---|---|---|
-| A — prepare | summarize metrics, brief, scenario calculation | May run on demand or controlled schedule; always visible as cited draft. |
-| B — internal/reversible | create/update internal task or attach note | User confirmation by default; optional narrowly configured rule; record actor and before/after. |
+| Tier                       | Example                                                                            | MVP behavior                                                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| A — prepare                | summarize metrics, brief, scenario calculation                                     | May run on demand or controlled schedule; always visible as cited draft.                                                             |
+| B — internal/reversible    | create/update internal task or attach note                                         | User confirmation by default; optional narrowly configured rule; record actor and before/after.                                      |
 | C — consequential/external | customer message, budget-of-record, permissions, payment/refund, production change | Never executes in MVP. Can be shown as simulated approval request; future execution must require explicit authorized human approval. |
 
 Approval binds exact payload, rationale/evidence, target, reversibility, requester, required role, expiry, state and payload hash. Single-use; payload changes require new approval; rejected/expired request creates no side effect. Consequential approval requires a different authorized person than requester in any future live executor.

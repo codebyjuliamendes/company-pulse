@@ -1,8 +1,25 @@
 {
   "name": "company-pulse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Executive company health and decision workspace",
-  "engines": { "node": ">=22" },
-  "scripts": { "start": "node src/server.js", "dev": "node --watch src/server.js", "test": "node --test" }
+  "description": "Executive workspace that turns company signals into explainable, owned and measurable decisions",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run format:check && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
+    "prettier": "^3.9.10"
+  }
 }

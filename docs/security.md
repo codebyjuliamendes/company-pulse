@@ -8,20 +8,20 @@ Assets include sessions, memberships, company records, metric lineage, agent out
 
 ## Threat model and controls
 
-| Threat | Control |
-|---|---|
-| Broken object authorization / tenant leak | Derive workspace from session membership; scope every query; test cross-tenant denial without existence leak. |
-| Role escalation | Central server-side permissions; deny by default; validate approver and state transitions in service layer. |
-| Prompt injection in imported text | Context minimization, delimit text as data, no arbitrary tools, strict schema and independent policy checks. |
-| Hallucinated metric or cause | Deterministic calculations, valid evidence references, stale/conflict qualification, no unsupported causal claims. |
-| Approval replay/tampering | Immutable canonical payload hash, one-time approval, expiry, atomic policy recheck; changed payload requires new request. |
-| CSRF/session theft | Secure HttpOnly SameSite cookies, CSRF token/origin checks, HTTPS when hosted. |
-| SQL/HTML injection | Parameterized SQL, validated input, escaping/sanitization, CSP. |
-| Data poisoning | Preview, provenance, reconciliation, quarantine, audit applied rows. |
-| Agent cost/DoS | Auth and per-user/workspace rate limits, concurrency/time/output bounds, cancellation. |
-| Sensitive logging | Allowlisted structured events; redact secrets; avoid raw prompt/context logs. |
-| Misleading demo state | Persistent `DEMO DATA` mark, simulated source labels/timestamps; no live monitoring claims. |
-| Self approval | Separate requester and approver for consequential future execution. |
+| Threat                                    | Control                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Broken object authorization / tenant leak | Derive workspace from session membership; scope every query; test cross-tenant denial without existence leak.             |
+| Role escalation                           | Central server-side permissions; deny by default; validate approver and state transitions in service layer.               |
+| Prompt injection in imported text         | Context minimization, delimit text as data, no arbitrary tools, strict schema and independent policy checks.              |
+| Hallucinated metric or cause              | Deterministic calculations, valid evidence references, stale/conflict qualification, no unsupported causal claims.        |
+| Approval replay/tampering                 | Immutable canonical payload hash, one-time approval, expiry, atomic policy recheck; changed payload requires new request. |
+| CSRF/session theft                        | Secure HttpOnly SameSite cookies, CSRF token/origin checks, HTTPS when hosted.                                            |
+| SQL/HTML injection                        | Parameterized SQL, validated input, escaping/sanitization, CSP.                                                           |
+| Data poisoning                            | Preview, provenance, reconciliation, quarantine, audit applied rows.                                                      |
+| Agent cost/DoS                            | Auth and per-user/workspace rate limits, concurrency/time/output bounds, cancellation.                                    |
+| Sensitive logging                         | Allowlisted structured events; redact secrets; avoid raw prompt/context logs.                                             |
+| Misleading demo state                     | Persistent `DEMO DATA` mark, simulated source labels/timestamps; no live monitoring claims.                               |
+| Self approval                             | Separate requester and approver for consequential future execution.                                                       |
 
 ## Agent contract
 
@@ -53,3 +53,20 @@ Audit fields: actor type/ID (user or schedule), workspace, action, resource, tim
 Use maintained auth/session; modern password KDF if passwords are implemented. CSRF, secure cookies in hosted environment, headers/CSP. Validate payloads and sizes; parameterize DB; escape text. Secrets outside source and placeholder-only env example. Auth throttles and bounded agent runs. Dependency checks in CI. Synthetic data only. Reset explains records cleared; never silently erase audit.
 
 Local SQLite demo does not prove production tenant isolation, uptime, backup or compliance. Real data/live integrations require security review/testing, privacy retention/deletion plan, production DB/secret management, encryption and restore drills, connector scope/webhook review, monitoring/incident response, and legal review for target markets.
+
+## Implementation status (current slice)
+
+Implemented and covered by automated tests:
+
+- **Server-side authorization:** central deny-by-default permission map (`src/domain/permissions.js`) for the six documented roles; every API route declares its permission. Analysts and viewers cannot review proposals; viewers are read-only and cannot read the audit log.
+- **Actor integrity:** the acting user comes from a signed demo-persona cookie (HMAC-SHA256, `HttpOnly`, `SameSite=Strict`, `Secure` in production, 12 h expiry). Body fields such as `reviewer` or `createdBy` are ignored; audit rows record `user:<id>` / `agent:<key>` plus the request id. _Selecting a persona is not authentication_; `DEMO_DEFAULT_PERSONA` (default `elena`) applies when no session exists and can be disabled to require a choice.
+- **CSRF:** writes must come from the same origin (or `PUBLIC_ORIGIN`), `Origin: null` is refused, and bodies must be `application/json`.
+- **Injection and XSS:** parameterized SQL only; the UI builds DOM nodes with `textContent` (no data in `innerHTML`); CSP `default-src 'self'` without `unsafe-inline`/`unsafe-eval`, `frame-ancestors 'none'`, `object-src 'none'`; `nosniff`, `X-Frame-Options`, `Referrer-Policy: no-referrer`, COOP/CORP, `Permissions-Policy`.
+- **Input validation:** types, lengths, calendar dates, identifier format and referenced records are checked; JSON bodies are capped at 64 KB (413); invalid JSON is 400. Unexpected errors return a generic message with `code` and `requestId`; details go only to the log.
+- **Abuse limits:** per-IP fixed-window limits on writes (`RATE_LIMIT_PER_MINUTE`) and agent runs (`AGENT_RUNS_PER_MINUTE`), 429 with `Retry-After`; HTTP header/request timeouts.
+- **Approvals:** single use (conditional update), payload hash re-checked, agents cannot review, approval and its internal task and audit event commit atomically; Tier C executors do not exist.
+- **Audit:** append-only via database triggers; events carry actor, action, resource, request id, safe details and payload hash where relevant.
+- **Logging:** one JSON line per event with request id, method, path (no query string), status, duration and actor; no bodies, secrets or prompts.
+- **Supply chain:** no runtime dependencies; `npm audit --audit-level=high` and Dependabot in CI; container runs as non-root.
+
+Not implemented (still required before real data): real authentication and sessions, multi-workspace tenant isolation, field-level restriction of finance metrics per role, approval expiry and separation of duties between requester and approver for future Tier C execution, secret management beyond `SESSION_SECRET`, shared rate-limit store for multiple instances, TLS termination (expected at a reverse proxy; set `TRUST_PROXY`, `COOKIE_SECURE=1` and `PUBLIC_ORIGIN`).

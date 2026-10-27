@@ -6,25 +6,25 @@ Base `/api/v1`; JSON UTF-8; opaque UUID IDs; UTC ISO-8601; tenant scope derived 
 
 ## Logical entities
 
-| Entity | Essential fields / constraints |
-|---|---|
-| `Workspace` | id, name, timezone, `demoMode`, createdAt; demo mode visibly true. |
-| `User`, `Membership` | user profile/auth; membership workspaceId/userId/role/status; unique workspace+user. |
-| `DataSource` | workspace, kind, label, mode/status, lastObservedAt, fixtureVersion; MVP mode=`simulated`. |
-| `ImportBatch` | workspace/source, status, timestamps/counts, actor; provenance root. |
-| `DataQualityFinding` | batch, severity/code, entityRef, affected metric keys, message/status. |
-| `MetricDefinition` | workspace/key/name/unit/definition/owner/grain/source/staleAfter; key unique per workspace. |
-| `MetricObservation` | workspace/metric/period/value/valueKind/currency/observedAt/batch/dimensions; kind actual/target/forecast/scenario; lineage preserved. |
-| `Signal` | workspace/rule/severity/title/summary/status/values/evidence refs/freshness/timestamps. |
-| `AgentRun` | workspace/agent/actor/trigger/status/idempotency key/rule & model version/times/summary/limitations; unique workspace+key. |
-| `AgentEvidence` | run/resource type+ID/snapshot hash/relevance; validated references. |
-| `Proposal` | workspace/run/action type/tier/title/payload/hash/rationale/status; immutable after approval request. |
-| `ApprovalRequest` | proposal/requester/required role/status/expiry/approver/time/payload hash; single use. |
-| `Priority`, `Initiative` | workspace/title/status/owner/due date/metric and signal links. |
-| `Decision` | workspace/title/rationale/expected outcome/owner/due/status/signal refs/meeting/creator; outcome captured at completion. |
-| `Task` | workspace/title/description/owner/due/status/source type+ID/creator; agent origin explicit. |
-| `Meeting`, `MeetingNote` | workspace/time/status/date range/facilitator; notes kind/body/confirmer/time/evidence; draft distinct from confirmed. |
-| `AuditEvent` | workspace/actor/action/resource/outcome/reason/payload hash/correlation/time; append-only, no secrets/prompts. |
+| Entity                   | Essential fields / constraints                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `Workspace`              | id, name, timezone, `demoMode`, createdAt; demo mode visibly true.                                                                     |
+| `User`, `Membership`     | user profile/auth; membership workspaceId/userId/role/status; unique workspace+user.                                                   |
+| `DataSource`             | workspace, kind, label, mode/status, lastObservedAt, fixtureVersion; MVP mode=`simulated`.                                             |
+| `ImportBatch`            | workspace/source, status, timestamps/counts, actor; provenance root.                                                                   |
+| `DataQualityFinding`     | batch, severity/code, entityRef, affected metric keys, message/status.                                                                 |
+| `MetricDefinition`       | workspace/key/name/unit/definition/owner/grain/source/staleAfter; key unique per workspace.                                            |
+| `MetricObservation`      | workspace/metric/period/value/valueKind/currency/observedAt/batch/dimensions; kind actual/target/forecast/scenario; lineage preserved. |
+| `Signal`                 | workspace/rule/severity/title/summary/status/values/evidence refs/freshness/timestamps.                                                |
+| `AgentRun`               | workspace/agent/actor/trigger/status/idempotency key/rule & model version/times/summary/limitations; unique workspace+key.             |
+| `AgentEvidence`          | run/resource type+ID/snapshot hash/relevance; validated references.                                                                    |
+| `Proposal`               | workspace/run/action type/tier/title/payload/hash/rationale/status; immutable after approval request.                                  |
+| `ApprovalRequest`        | proposal/requester/required role/status/expiry/approver/time/payload hash; single use.                                                 |
+| `Priority`, `Initiative` | workspace/title/status/owner/due date/metric and signal links.                                                                         |
+| `Decision`               | workspace/title/rationale/expected outcome/owner/due/status/signal refs/meeting/creator; outcome captured at completion.               |
+| `Task`                   | workspace/title/description/owner/due/status/source type+ID/creator; agent origin explicit.                                            |
+| `Meeting`, `MeetingNote` | workspace/time/status/date range/facilitator; notes kind/body/confirmer/time/evidence; draft distinct from confirmed.                  |
+| `AuditEvent`             | workspace/actor/action/resource/outcome/reason/payload hash/correlation/time; append-only, no secrets/prompts.                         |
 
 Normalize core records; version/schema-check JSON metadata. Foreign keys, tenant-scoped indexes. Uniqueness for observations by metric/period/kind/dimensions/source; agent idempotency. State changes use optimistic `version` checks.
 
@@ -69,17 +69,50 @@ Content-Type: application/json
 ```
 
 ```json
-{"data":{"id":"run_opaque_id","agentKey":"finance","status":"queued","demoMode":true}}
+{ "data": { "id": "run_opaque_id", "agentKey": "finance", "status": "queued", "demoMode": true } }
 ```
 
 ```json
-{"data":{"id":"run_opaque_id","status":"succeeded","summary":"Cash is 6% below plan.","confidence":"medium","limitations":["Simulated source last refreshed 2 hours ago."],"evidence":[{"type":"metric_observation","id":"obs_opaque_id","metricKey":"cash_balance","observedAt":"2026-10-26T12:00:00Z"}],"proposals":[{"id":"proposal_opaque_id","tier":"B","actionType":"create_internal_task","status":"draft"}]}}
+{
+  "data": {
+    "id": "run_opaque_id",
+    "status": "succeeded",
+    "summary": "Cash is 6% below plan.",
+    "confidence": "medium",
+    "limitations": ["Simulated source last refreshed 2 hours ago."],
+    "evidence": [
+      { "type": "metric_observation", "id": "obs_opaque_id", "metricKey": "cash_balance", "observedAt": "2026-10-26T12:00:00Z" }
+    ],
+    "proposals": [{ "id": "proposal_opaque_id", "tier": "B", "actionType": "create_internal_task", "status": "draft" }]
+  }
+}
 ```
 
 ```json
-{"error":{"code":"FORBIDDEN","message":"You do not have access to this action.","requestId":"req_opaque_id"}}
+{ "error": { "code": "FORBIDDEN", "message": "You do not have access to this action.", "requestId": "req_opaque_id" } }
 ```
 
 ## Invariants
 
 Recompute critical figures server-side. Validate dates, role, workspace, action allowlist, size and evidence. Approval operation plus audit event are one DB transaction. Retries are idempotent; stale versions conflict. Never return restricted metrics because caller requests broad overview. Freshness is metric-specific. Agent cannot set workspace/tier/approver/target. Tier C executor is disabled and responds `not_supported_in_demo` without side effects.
+
+## Implementation status (current slice)
+
+The shipped API is the unversioned `/api` surface below; the `/api/v1` contracts above remain the target. Responses are JSON with `Cache-Control: no-store`. Errors keep the original contract — `error` is a human-readable string — and add `code` and `requestId`: `{"error":"Decision must be approved or rejected.","code":"VALIDATION_ERROR","requestId":"…"}`. Writes need `Content-Type: application/json` and a same-origin `Origin` (when sent). Every response carries `X-Request-Id`.
+
+| Method and path                                                                                     | Permission         | Notes                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                                                                                   | public             | `{status, version, schemaVersion, expectedSchemaVersion}`; touches the database                                                                                                                                                                                                                         |
+| `GET /api/session` · `POST /api/session` `{personaId}` · `DELETE /api/session`                      | public             | demo persona switch (signed cookie), not authentication                                                                                                                                                                                                                                                 |
+| `GET /api/dashboard`                                                                                | `workspace.read`   | company, `viewer` (role, permissions), personas, metrics with definition/direction/status/stale flags, current findings with `rule_id`, `facts`, `limitations`, evidence; proposals with `tier` and `payload_hash`; tasks, briefings, decisions, meetings, agents with `lastRun`, domain health, counts |
+| `GET /api/agents`                                                                                   | `workspace.read`   | agent metadata                                                                                                                                                                                                                                                                                          |
+| `GET /api/audit?limit=`                                                                             | `audit.read`       | newest first, 1–200 (default 80)                                                                                                                                                                                                                                                                        |
+| `POST /api/agents/run` · `POST /api/agents/:key/run`                                                | `agents.run`       | optional `Idempotency-Key`; 201 with results and dashboard; failed agent → recorded, 500 `AGENT_RUN_FAILED` for a single run                                                                                                                                                                            |
+| `POST /api/proposals/:id/review` `{decision, note?}`                                                | `proposals.review` | approval creates the proposed internal task; 409 if already reviewed or payload changed                                                                                                                                                                                                                 |
+| `POST /api/meetings` `{title, briefingId?, agenda?, notes?}`                                        | `meetings.manage`  | agenda ≤ 20 000, notes ≤ 8 000 characters (rejected, no longer truncated)                                                                                                                                                                                                                               |
+| `POST /api/decisions` `{title, decision, owner, expectedOutcome, dueDate?, findingId?, meetingId?}` | `decisions.manage` | `dueDate` must be a real `YYYY-MM-DD`; references must exist                                                                                                                                                                                                                                            |
+| `POST /api/decisions/:id/outcome` `{actualOutcome, status}`                                         | `decisions.manage` | `completed` or `reversed`                                                                                                                                                                                                                                                                               |
+| `POST /api/tasks/:id/complete` `{outcome?}`                                                         | `tasks.manage`     |                                                                                                                                                                                                                                                                                                         |
+| `POST /api/scenarios/preview`                                                                       | `scenarios.run`    | numbers (or numeric strings) within ±100 %; hires an integer 0–1000; never writes                                                                                                                                                                                                                       |
+
+Actor fields in request bodies (`reviewer`, `createdBy`) are ignored; the actor is the session persona. Lists are bounded (no cursors yet).
