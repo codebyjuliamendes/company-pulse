@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    ports:
+      - '3100:3100'
+    environment:
+      LOG_LEVEL: info
+      RATE_LIMIT_PER_MINUTE: 60
+      AGENT_RUNS_PER_MINUTE: 12
+      # Local HTTP: Secure cookies would be dropped by the browser. Use 1 behind HTTPS.
+      COOKIE_SECURE: 0
+      SESSION_SECRET: ${SESSION_SECRET:-}
+    volumes:
+      - company-pulse-data:/data
+    restart: unless-stopped
+
+volumes:
+  company-pulse-data:
