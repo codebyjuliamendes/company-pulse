@@ -1142,6 +1142,9 @@
         a.setAttribute('aria-current', 'page');
       }),
     );
-    load();
+    // Without a session (and no server default persona) ask for one instead of requesting the dashboard.
+    api('/api/session')
+      .then(session => (session.viewer ? load() : openPersonas()))
+      .catch(() => load());
   });
 })();
